@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DropCheck Studio — Consensus-Verified Airdrop Terms on GenLayer</title>
+<meta name="description" content="DropCheck is a GenLayer Intelligent Contract that reads airdrop and project pages and stores their terms — chain, deadline, cost model, eligibility — only after validator consensus reproduces the exact same extraction. This app shows the verified records live from StudioNet.">
+<style>
+  :root {
+    --bg: #10100e; --panel: #1a1a17; --panel2: #22221e; --line: #3a382c;
+    --text: #f5f1e6; --muted: #b3ab93; --amber: #f5a623; --amber2: #ffd166;
+    --teal: #2ec4b6; --red: #ef6461; --grey: #8d897a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: Georgia, "Times New Roman", serif; line-height: 1.55; }
+  a { color: var(--amber2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 30px 18px 60px; }
+  header { border-bottom: 3px double var(--line); padding-bottom: 20px; }
+  header .kicker { font-family: "Courier New", monospace; font-size: .8rem; letter-spacing: 3px; text-transform: uppercase; color: var(--amber); }
+  header h1 { font-size: 2.5rem; margin-top: 6px; }
+  header h1 .thin { font-weight: normal; color: var(--muted); }
+  header p.sub { color: var(--muted); max-width: 700px; margin-top: 10px; font-size: 1.02rem; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; font-family: "Courier New", monospace; }
+  .pill { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 3px 11px; font-size: .78rem; }
+  .pill b { color: var(--amber2); font-weight: 700; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 24px 0 4px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--amber); padding: 14px; text-align: center; }
+  .stat .num { font-size: 1.8rem; font-weight: 700; }
+  .stat .lbl { color: var(--muted); font-size: .85rem; font-family: "Courier New", monospace; text-transform: uppercase; letter-spacing: 1px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; flex-wrap: wrap; gap: 10px; }
+  .toolbar h2 { font-size: 1.35rem; }
+  .btn { display: inline-block; background: var(--amber); color: #161616; padding: 8px 15px; font-weight: 700; font-size: .9rem; border: none; cursor: pointer; font-family: "Courier New", monospace; }
+  .btn:hover { text-decoration: none; opacity: .9; }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 14px; margin-top: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); padding: 18px; position: relative; }
+  .card .name { font-size: 1.3rem; font-weight: 700; padding-right: 92px; }
+  .cost { position: absolute; top: 16px; right: 16px; font-family: "Courier New", monospace; font-size: .72rem; font-weight: 700; letter-spacing: 1px; padding: 4px 9px; text-transform: uppercase; }
+  .cost.free { background: rgba(46,196,182,.15); color: var(--teal); border: 1px solid rgba(46,196,182,.5); }
+  .cost.paid { background: rgba(239,100,97,.13); color: var(--red); border: 1px solid rgba(239,100,97,.5); }
+  .cost.unclear { background: rgba(245,166,35,.12); color: var(--amber2); border: 1px solid rgba(245,166,35,.5); }
+  .rows { margin-top: 12px; font-size: .95rem; }
+  .rows .row { display: flex; gap: 8px; padding: 5px 0; border-top: 1px dashed var(--line); }
+  .rows .k { font-family: "Courier New", monospace; font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); min-width: 96px; padding-top: 3px; }
+  .rows .v { word-break: break-word; }
+  .card .src { margin-top: 12px; font-size: .85rem; word-break: break-all; }
+  .card .meta { margin-top: 8px; color: var(--grey); font-size: .75rem; font-family: "Courier New", monospace; word-break: break-all; }
+  .empty, .loading, .error { color: var(--muted); border: 1px dashed var(--line); padding: 18px; margin-top: 16px; text-align: center; }
+  .error { color: var(--red); border-color: rgba(239,100,97,.4); }
+  .howto { background: var(--panel); border: 1px solid var(--line); padding: 20px; margin-top: 16px; }
+  .howto ol { margin: 10px 0 0 20px; }
+  .howto li { margin: 6px 0; }
+  .howto code { background: var(--panel2); border: 1px solid var(--line); padding: 1px 6px; font-size: .85em; font-family: "Courier New", monospace; word-break: break-all; }
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  section { margin-top: 34px; }
+  section .desc { color: var(--muted); max-width: 780px; margin-top: 4px; }
+  .contract-line { font-size: .82rem; color: var(--muted); margin-top: 6px; word-break: break-all; font-family: "Courier New", monospace; }
+  footer { margin-top: 46px; text-align: center; color: var(--grey); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">GenLayer · StudioNet · Terms Registry</div>
+    <h1>DropCheck <span class="thin">Studio</span></h1>
+    <p class="sub">Before you chase a drop, check what its page <i>actually</i> says. The DropCheck Intelligent Contract
+      renders a project or airdrop page, extracts its terms — chain, deadline, cost model, eligibility — and stores
+      them on-chain <b>only when independent validators reproduce the exact same extraction</b>. Every card below is
+      read live from that contract.</p>
+    <div class="badges">
+      <span class="pill">Network: <b>GenLayer StudioNet</b></span>
+      <span class="pill">Consensus: <b>strict equivalence</b></span>
+      <span class="pill">Data: <b>live on-chain reads</b></span>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="num" id="stat-total">…</div><div class="lbl">Drops checked</div></div>
+    <div class="stat"><div class="num" id="stat-free">…</div><div class="lbl">Verified free</div></div>
+    <div class="stat"><div class="num" id="stat-paid">…</div><div class="lbl">Verified paid</div></div>
+    <div class="stat"><div class="num" id="stat-unclear">…</div><div class="lbl">Cost unclear</div></div>
+  </div>
+
+  <div class="toolbar">
+    <h2>Verified drop records</h2>
+    <button class="btn ghost" id="refresh">↻ Refresh on-chain data</button>
+  </div>
+  <p class="contract-line">Contract: <a href="https://explorer-studio.genlayer.com/address/0x54aD23aA37BDdB41a746Ca71230f534beC2A2760" target="_blank" rel="noopener">0x54aD23aA37BDdB41a746Ca71230f534beC2A2760</a> · method <code>check_drop(url)</code></p>
+  <div id="drops"><div class="loading">Loading verified records from StudioNet…</div></div>
+
+  <section>
+    <h2>Why consensus, not a scraper?</h2>
+    <p class="desc">A normal scraper gives you one machine's opinion of a web page — easy to fool, easy to fake.
+      DropCheck runs the extraction inside GenLayer consensus: the leader renders the page and extracts the terms,
+      then every validator renders and extracts independently. The record is stored only on an <b>exact match</b>.
+      Pages whose rendered text changes between fetches (heavy JavaScript, rotating content) fail consensus and are
+      rejected instead of being guessed at — during seeding, several well-known project pages were rejected exactly
+      this way, and none of them appear above.</p>
+  </section>
+
+  <section>
+    <h2>Check a drop yourself</h2>
+    <div class="howto">
+      <p>Reads on this page are permissionless. New checks go through GenLayer Studio, where the contract is deployed:</p>
+      <ol>
+        <li>Open <a href="https://studio.genlayer.com/contracts" target="_blank" rel="noopener">GenLayer Studio</a> — it creates a funded StudioNet account for you.</li>
+        <li>Run <code>check_drop</code> on DropCheck (<code>0x54aD…2760</code>) with the project or airdrop page URL.</li>
+        <li>Wait for consensus, then refresh this page — if validators reproduced the same terms, the verified card appears here.</li>
+      </ol>
+      <div class="btnrow">
+        <a class="btn" href="https://studio.genlayer.com/contracts" target="_blank" rel="noopener">Open GenLayer Studio</a>
+        <a class="btn ghost" href="https://github.com/adryanryan03-create/dropcheck-genlayer" target="_blank" rel="noopener">DropCheck source</a>
+        <a class="btn ghost" href="https://explorer-studio.genlayer.com/address/0x54aD23aA37BDdB41a746Ca71230f534beC2A2760" target="_blank" rel="noopener">Contract explorer</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Built on <a href="https://genlayer.com" target="_blank" rel="noopener">GenLayer</a> — the intelligence layer for the agentic economy.
+    All records on this page are read live from the DropCheck contract on StudioNet; nothing is cached or simulated.
+  </footer>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "genlayer-js": "https://esm.sh/genlayer-js@2.0.0",
+  "genlayer-js/chains": "https://esm.sh/genlayer-js@2.0.0/chains"
+} }
+</script>
+<script type="module">
+import { createClient } from "genlayer-js";
+import { studionet } from "genlayer-js/chains";
+
+const DC = "0x54aD23aA37BDdB41a746Ca71230f534beC2A2760";
+const client = createClient({ chain: studionet });
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const short = (a) => a && a.length > 18 ? a.slice(0, 10) + "…" + a.slice(-6) : (a || "");
+const num = (v) => { try { return Number(v); } catch { return 0; } };
+const val = (s) => { const t = String(s ?? "").trim(); return t && t !== "NOT_STATED" ? esc(t) : '<span style="color:var(--grey)">not stated on page</span>'; };
+
+async function read(fn, args = []) {
+  return client.readContract({ address: DC, functionName: fn, args });
+}
+
+function dropCard(d, id) {
+  const cost = ["free", "paid", "unclear"].includes(d.cost_model) ? d.cost_model : "unclear";
+  return `<div class="card">
+    <div class="name">${esc(d.project_name)}</div>
+    <span class="cost ${cost}">${cost === "unclear" ? "cost unclear" : cost}</span>
+    <div class="rows">
+      <div class="row"><span class="k">Chain</span><span class="v">${val(d.chain)}</span></div>
+      <div class="row"><span class="k">Deadline</span><span class="v">${val(d.deadline_or_launch)}</span></div>
+      <div class="row"><span class="k">Eligibility</span><span class="v">${val(d.eligibility_summary)}</span></div>
+    </div>
+    <div class="src">Source page: <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url)}</a></div>
+    <div class="meta">Record #${id} · checked by ${esc(short(d.submitter))} · stored by validator consensus on StudioNet</div>
+  </div>`;
+}
+
+async function load() {
+  const el = document.getElementById("drops");
+  try {
+    const total = num(await read("get_drop_count"));
+    document.getElementById("stat-total").textContent = total;
+    if (total === 0) {
+      document.getElementById("stat-free").textContent = 0;
+      document.getElementById("stat-paid").textContent = 0;
+      document.getElementById("stat-unclear").textContent = 0;
+      el.innerHTML = '<div class="empty">No verified records yet — be the first to run <b>check_drop</b> in GenLayer Studio.</div>';
+      return;
+    }
+    const drops = [];
+    for (let i = total - 1; i >= 0; i--) drops.push({ d: await read("get_drop", [String(i)]), id: i });
+    document.getElementById("stat-free").textContent = drops.filter(x => x.d.cost_model === "free").length;
+    document.getElementById("stat-paid").textContent = drops.filter(x => x.d.cost_model === "paid").length;
+    document.getElementById("stat-unclear").textContent = drops.filter(x => x.d.cost_model !== "free" && x.d.cost_model !== "paid").length;
+    el.innerHTML = `<div class="cards">${drops.map(x => dropCard(x.d, x.id)).join("")}</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="error">Could not load DropCheck data from StudioNet (${esc(e.message || e)}). Try Refresh.</div>`;
+  }
+}
+
+document.getElementById("refresh").addEventListener("click", load);
+load();
+</script>
+</body>
+</html>
