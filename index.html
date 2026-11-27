@@ -67,7 +67,9 @@
     <p class="sub">Before you chase a drop, check what its page <i>actually</i> says. The DropCheck Intelligent Contract
       renders a project or airdrop page, extracts its terms — chain, deadline, cost model, eligibility — and stores
       them on-chain <b>only when independent validators reproduce the exact same extraction</b>. Every card below is
-      read live from that contract.</p>
+      read live from that contract. <b>New in v2:</b> records can be re-checked against the live page, and every
+      re-check is kept in an on-chain verification history — so when a page quietly moves a deadline or turns a free
+      mint into a paid one, the change is visible.</p>
     <div class="badges">
       <span class="pill">Network: <b>GenLayer StudioNet</b></span>
       <span class="pill">Consensus: <b>strict equivalence</b></span>
@@ -86,8 +88,24 @@
     <h2>Verified drop records</h2>
     <button class="btn ghost" id="refresh">↻ Refresh on-chain data</button>
   </div>
-  <p class="contract-line">Contract: <a href="https://explorer-studio.genlayer.com/address/0x54aD23aA37BDdB41a746Ca71230f534beC2A2760" target="_blank" rel="noopener">0x54aD23aA37BDdB41a746Ca71230f534beC2A2760</a> · method <code>check_drop(url)</code></p>
+  <p class="contract-line">Contract (v2): <a href="https://explorer-studio.genlayer.com/address/0xCD24Cbe4188Ed138a67c7e6763B4013c830FFf30" target="_blank" rel="noopener">0xCD24Cbe4188Ed138a67c7e6763B4013c830FFf30</a> · methods <code>check_drop(url)</code> · <code>recheck_drop(drop_id)</code></p>
   <div id="drops"><div class="loading">Loading verified records from StudioNet…</div></div>
+
+  <section>
+    <h2>Verification history</h2>
+    <p class="desc">New in DropCheck v2: any record can be <b>re-checked</b> against its live page. The contract re-runs the
+      same consensus extraction and compares the five term fields with the stored snapshot. Every re-check is appended
+      to an on-chain history with a status — <b>UNCHANGED</b> or <b>CHANGED</b> — and the fields that changed.
+      Pick a record id to see its checks, its latest status, and its full history, read live from the contract.</p>
+    <div class="howto">
+      <div class="btnrow" style="margin-top:0">
+        <label for="hist-id" style="font-family:'Courier New',monospace;font-size:.85rem">Record id:</label>
+        <input id="hist-id" type="number" min="0" step="1" value="0" style="width:80px;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 9px;font-family:'Courier New',monospace">
+        <button class="btn" id="hist-load">Load history</button>
+      </div>
+      <div id="history"><div class="empty">Choose a record id and load its verification history.</div></div>
+    </div>
+  </section>
 
   <section>
     <h2>Why consensus, not a scraper?</h2>
@@ -105,13 +123,14 @@
       <p>Reads on this page are permissionless. New checks go through GenLayer Studio, where the contract is deployed:</p>
       <ol>
         <li>Open <a href="https://studio.genlayer.com/contracts" target="_blank" rel="noopener">GenLayer Studio</a> — it creates a funded StudioNet account for you.</li>
-        <li>Run <code>check_drop</code> on DropCheck (<code>0x54aD…2760</code>) with the project or airdrop page URL.</li>
+        <li>Run <code>check_drop</code> on DropCheck v2 (<code>0xCD24…Ff30</code>) with the project or airdrop page URL.</li>
         <li>Wait for consensus, then refresh this page — if validators reproduced the same terms, the verified card appears here.</li>
+        <li>To re-verify an existing record against its live page, run <code>recheck_drop</code> with the record id — the outcome lands in the verification history above.</li>
       </ol>
       <div class="btnrow">
         <a class="btn" href="https://studio.genlayer.com/contracts" target="_blank" rel="noopener">Open GenLayer Studio</a>
         <a class="btn ghost" href="https://github.com/adryanryan03-create/dropcheck-genlayer" target="_blank" rel="noopener">DropCheck source</a>
-        <a class="btn ghost" href="https://explorer-studio.genlayer.com/address/0x54aD23aA37BDdB41a746Ca71230f534beC2A2760" target="_blank" rel="noopener">Contract explorer</a>
+        <a class="btn ghost" href="https://explorer-studio.genlayer.com/address/0xCD24Cbe4188Ed138a67c7e6763B4013c830FFf30" target="_blank" rel="noopener">Contract explorer</a>
       </div>
     </div>
   </section>
@@ -132,7 +151,7 @@
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
-const DC = "0x54aD23aA37BDdB41a746Ca71230f534beC2A2760";
+const DC = "0xCD24Cbe4188Ed138a67c7e6763B4013c830FFf30";
 const client = createClient({ chain: studionet });
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -144,6 +163,13 @@ async function read(fn, args = []) {
   return client.readContract({ address: DC, functionName: fn, args });
 }
 
+function statusBadge(s) {
+  const st = String(s || "VERIFIED");
+  const color = st === "CHANGED" ? "var(--amber2)" : "var(--teal)";
+  const bg = st === "CHANGED" ? "rgba(245,166,35,.12)" : "rgba(46,196,182,.12)";
+  return `<span style="font-family:'Courier New',monospace;font-size:.7rem;font-weight:700;letter-spacing:1px;padding:2px 8px;color:${color};border:1px solid ${color};background:${bg}">${esc(st)}</span>`;
+}
+
 function dropCard(d, id) {
   const cost = ["free", "paid", "unclear"].includes(d.cost_model) ? d.cost_model : "unclear";
   return `<div class="card">
@@ -153,6 +179,7 @@ function dropCard(d, id) {
       <div class="row"><span class="k">Chain</span><span class="v">${val(d.chain)}</span></div>
       <div class="row"><span class="k">Deadline</span><span class="v">${val(d.deadline_or_launch)}</span></div>
       <div class="row"><span class="k">Eligibility</span><span class="v">${val(d.eligibility_summary)}</span></div>
+      <div class="row"><span class="k">Checks</span><span class="v">${num(d.checks)} · last status ${statusBadge(d.last_status)}</span></div>
     </div>
     <div class="src">Source page: <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url)}</a></div>
     <div class="meta">Record #${id} · checked by ${esc(short(d.submitter))} · stored by validator consensus on StudioNet</div>
@@ -182,7 +209,45 @@ async function load() {
   }
 }
 
+async function loadHistory() {
+  const el = document.getElementById("history");
+  const idStr = String(document.getElementById("hist-id").value || "0").trim();
+  el.innerHTML = '<div class="loading">Reading verification history from StudioNet…</div>';
+  try {
+    const d = await read("get_drop", [idStr]);
+    const hcount = num(await read("get_history_count", [idStr]));
+    // History entries live in one global log; scan it and keep this drop's.
+    const entries = [];
+    for (let i = 0; i < 200; i++) {
+      let e;
+      try { e = await read("get_history_entry", [String(i)]); } catch { break; }
+      if (String(e.drop_id) === idStr) entries.push({ e, idx: i });
+    }
+    let html = `<div class="rows">
+      <div class="row"><span class="k">Project</span><span class="v">${esc(d.project_name)} (record #${esc(idStr)})</span></div>
+      <div class="row"><span class="k">Checks</span><span class="v">${num(d.checks)} total · ${hcount} re-check${hcount === 1 ? "" : "s"} in history</span></div>
+      <div class="row"><span class="k">Last status</span><span class="v">${statusBadge(d.last_status)}</span></div>
+    </div>`;
+    if (entries.length === 0) {
+      html += '<div class="empty">No re-checks recorded for this record yet — run <b>recheck_drop</b> in GenLayer Studio to add one.</div>';
+    } else {
+      html += entries.map(({ e, idx }) => `<div class="card" style="margin-top:12px">
+        <div class="name" style="font-size:1.05rem">Check #${num(e.check_no)} ${statusBadge(e.status)}</div>
+        <div class="rows">
+          <div class="row"><span class="k">Changed</span><span class="v">${e.changed_fields ? esc(e.changed_fields) : '<span style="color:var(--grey)">nothing — terms identical</span>'}</span></div>
+          <div class="row"><span class="k">Snapshot</span><span class="v" style="font-family:'Courier New',monospace;font-size:.78rem">${esc(e.snapshot)}</span></div>
+        </div>
+        <div class="meta">History entry #${idx} · stored by validator consensus on StudioNet</div>
+      </div>`).join("");
+    }
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="error">Could not load history for record ${esc(idStr)} (${esc(e.message || e)}). Does that record exist?</div>`;
+  }
+}
+
 document.getElementById("refresh").addEventListener("click", load);
+document.getElementById("hist-load").addEventListener("click", loadHistory);
 load();
 </script>
 </body>
